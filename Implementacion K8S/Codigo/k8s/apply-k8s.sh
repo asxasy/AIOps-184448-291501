@@ -44,6 +44,8 @@ kubectl apply -f configmaps/otel-collector-config.yaml
 kubectl apply -f configmaps/grafana-provisioning.yaml
 kubectl apply -f configmaps/grafana-dashboards.yaml
 kubectl apply -f configmaps/grafana-dashboard-infra.yaml
+# Golden signals: tiene que existir antes del deployment de Grafana (lo monta como volumen).
+kubectl apply -f configmaps/grafana-dashboard-golden-signals.yaml
 kubectl apply -f configmaps/fluent-bit-config.yaml
 
 echo ""
