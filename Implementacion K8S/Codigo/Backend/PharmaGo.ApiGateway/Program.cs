@@ -5,6 +5,7 @@ using AspNetCoreRateLimit;
 using PharmaGo.ApiGateway.Middleware;
 using Instrumentation;
 using InstrumentationInterface;
+using Yarp.ReverseProxy.Health;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,6 +39,11 @@ builder.Services.AddReverseProxy()
             return default;
         });
     });
+
+// Circuit breaker (health check pasivo de YARP): ventana de detección y tasa de fallas desde appsettings
+// (sección ReverseProxyHealth). Sin esto YARP usa su ventana por defecto y el destino queda abierto al menos 60 s.
+builder.Services.Configure<TransportFailureRateHealthPolicyOptions>(
+    builder.Configuration.GetSection("ReverseProxyHealth:TransportFailureRate"));
 
 builder.Services.AddSingleton<ICustomMetrics, CustomMetrics>();
 
