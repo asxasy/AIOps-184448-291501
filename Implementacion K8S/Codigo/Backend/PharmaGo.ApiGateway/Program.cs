@@ -45,6 +45,9 @@ builder.Services.AddReverseProxy()
 builder.Services.Configure<TransportFailureRateHealthPolicyOptions>(
     builder.Configuration.GetSection("ReverseProxyHealth:TransportFailureRate"));
 
+// /health propio del Gateway para sus probes de Kubernetes: lo responde el propio proceso, sin depender de los backends.
+builder.Services.AddHealthChecks();
+
 builder.Services.AddSingleton<ICustomMetrics, CustomMetrics>();
 
 builder.Services.AddOpenTelemetry()
@@ -96,6 +99,7 @@ else if (rateLimitMode.Equals("User", StringComparison.OrdinalIgnoreCase))
 
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
 app.MapReverseProxy();
 app.MapPrometheusScrapingEndpoint();
 

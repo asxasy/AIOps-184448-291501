@@ -3,8 +3,13 @@ kind: Deployment
 metadata:
   name: pharmago-ui
   namespace: pharmago
+  labels:
+    app: pharmago-ui
+    app.kubernetes.io/part-of: pharmago
+    pharmago/tier: frontend
 spec:
-  replicas: 1
+  # Alta disponibilidad: 2 réplicas de nginx sirviendo estáticos (stateless).
+  replicas: 2
   selector:
     matchLabels:
       app: pharmago-ui
@@ -12,6 +17,8 @@ spec:
     metadata:
       labels:
         app: pharmago-ui
+        app.kubernetes.io/part-of: pharmago
+        pharmago/tier: frontend
     spec:
       affinity:
         nodeAffinity:
@@ -21,29 +28,48 @@ spec:
               - key: node-type
                 operator: In
                 values: [frontend, all]
+        # "preferred" porque Minikube tiene un solo nodo.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: pharmago-ui
+      # Nodos frontend dedicados en multinodo (taint dedicated=frontend:NoSchedule).
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: frontend
+        effect: NoSchedule
       containers:
       - name: pharmago-ui
         image: pharmago-ui:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 80
+        # nginx sirviendo estáticos usa pocos MB: se baja el request de 128Mi a
+        # 64Mi para dejar margen en el nodo.
         resources:
           requests:
-            memory: "128Mi"
+            memory: "64Mi"
             cpu: "50m"
           limits:
-            memory: "256Mi"
+            memory: "128Mi"
             cpu: "200m"
         readinessProbe:
           httpGet:
             path: /
             port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 2
+          failureThreshold: 2
         livenessProbe:
           httpGet:
             path: /
             port: 80
-          initialDelaySeconds: 30
-          periodSeconds: 10
-
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
