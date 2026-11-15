@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -12,6 +13,15 @@ using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Logs estructurados en JSON (una línea por evento) para que Fluent Bit los indexe en Elasticsearch.
+// Se configura acá y no en appsettings para que valga en cualquier entorno.
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.UseUtcTimestamp = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    options.JsonWriterOptions = new JsonWriterOptions { Indented = false };
+});
 // TraceId/SpanId de la request en el scope de cada log (Scopes.TraceId en Kibana).
 builder.Services.AddTraceContextToLogs();
 
