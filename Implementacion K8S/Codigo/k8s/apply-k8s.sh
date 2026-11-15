@@ -44,6 +44,9 @@ kubectl apply -f configmaps/otel-collector-config.yaml
 kubectl apply -f configmaps/grafana-provisioning.yaml
 kubectl apply -f configmaps/grafana-dashboards.yaml
 kubectl apply -f configmaps/grafana-dashboard-infra.yaml
+# Golden signals y alertas: tienen que existir antes del deployment de Grafana (los monta como volumen).
+kubectl apply -f configmaps/grafana-dashboard-golden-signals.yaml
+kubectl apply -f configmaps/grafana-alerting.yaml
 kubectl apply -f configmaps/fluent-bit-config.yaml
 
 echo ""
@@ -114,6 +117,10 @@ if [ $timeout -ge $max_timeout ]; then
 fi
 
 # Resto de servicios ops
+# Jaeger (backend de trazas) antes del collector, que le exporta por OTLP.
+kubectl apply -f services/ops/jaeger-service.yaml
+kubectl apply -f deployments/ops/jaeger-deployment.yaml
+
 kubectl apply -f services/ops/otel-collector-service.yaml
 kubectl apply -f deployments/ops/otel-collector-deployment.yaml
 
@@ -156,6 +163,11 @@ kubectl apply -f deployments/frontend/ui-deployment.yaml
 echo ""
 echo "10. PodDisruptionBudgets (al menos 1 réplica disponible durante disrupciones voluntarias)..."
 kubectl apply -f policies/pod-disruption-budgets.yaml
+
+echo ""
+echo "11. Recargando configuración de Prometheus..."
+# Prometheus monta su config con subPath: un cambio en el ConfigMap no llega al pod sin reiniciarlo.
+kubectl rollout restart deployment/prometheus -n pharmago
 
 echo ""
 echo "=== Despliegue completado ==="

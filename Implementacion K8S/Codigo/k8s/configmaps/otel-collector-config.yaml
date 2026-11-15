@@ -11,14 +11,43 @@ data:
           grpc:
             endpoint: "0.0.0.0:4317"
 
+    processors:
+      # Primero en cada pipeline: si el collector se acerca a su límite de memoria
+      # rechaza datos (los SDK reintentan) en vez de morir por OOM.
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      # Agrupa spans antes de mandarlos a Jaeger (menos llamadas de red).
+      batch:
+        send_batch_size: 512
+        timeout: 2s
+
     exporters:
+      # Métricas: Prometheus las scrapea en :8889 (job otlp-collector).
+      # El service.name de cada SDK queda como label exported_job (ej. PharmaGo.ApiGateway).
       prometheus:
         endpoint: "0.0.0.0:8889"
-      debug: {}
+        # Explícito para que los nombres no cambien entre versiones del collector:
+        # pharmago_http_requests_total, pharmago_http_request_duration_milliseconds_bucket, etc.
+        translation_strategy: UnderscoreEscapingWithSuffixes
+      # Trazas: a Jaeger por OTLP gRPC dentro del cluster.
+      # En el collector 0.162 el exporter se llama otlp_grpc (otlp quedó como alias deprecado).
+      otlp_grpc/jaeger:
+        endpoint: "jaeger:4317"
+        tls:
+          insecure: true
+      # Verbosidad basic: una línea por lote. La salida del collector va a Elasticsearch vía Fluent Bit.
+      debug:
+        verbosity: basic
 
     service:
       pipelines:
         metrics:
           receivers: [otlp]
+          processors: [memory_limiter]
           exporters: [prometheus, debug]
-
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp_grpc/jaeger]

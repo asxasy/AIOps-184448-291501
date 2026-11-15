@@ -1,6 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using AspNetCoreRateLimit;
 using PharmaGo.ApiGateway.Middleware;
 using Instrumentation;
@@ -9,6 +12,18 @@ using Yarp.ReverseProxy.Health;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Logs estructurados en JSON (una línea por evento) para que Fluent Bit los indexe en Elasticsearch.
+// Se configura acá y no en appsettings para que valga en cualquier entorno.
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.UseUtcTimestamp = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    options.JsonWriterOptions = new JsonWriterOptions { Indented = false };
+});
+// TraceId/SpanId de la request en el scope de cada log (Scopes.TraceId en Kibana).
+builder.Services.AddTraceContextToLogs();
 
 builder.Services.AddMemoryCache();
 
@@ -50,15 +65,42 @@ builder.Services.AddHealthChecks();
 
 builder.Services.AddSingleton<ICustomMetrics, CustomMetrics>();
 
+var otlpEndpoint = TracingExtensions.OtlpEndpoint;
+
 builder.Services.AddOpenTelemetry()
+    // service.instance.id = nombre del pod, para distinguir réplicas en Prometheus y Jaeger.
+    .ConfigureResource(resource => resource.AddService("PharmaGo.ApiGateway", serviceInstanceId: Environment.MachineName))
     .WithMetrics(metricsBuilder => 
     {
         metricsBuilder
-            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("PharmaGo.ApiGateway"))
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddMeter("PharmaGo.CustomMetrics")
-            .AddPrometheusExporter();
+            .AddPrometheusExporter()
+            // Métricas por OTLP al collector, igual que los microservicios (el collector las expone a Prometheus).
+            .AddOtlpExporter((exporterOptions, readerOptions) =>
+            {
+                exporterOptions.Endpoint = otlpEndpoint;
+                exporterOptions.Protocol = OtlpExportProtocol.Grpc;
+                readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = TracingExtensions.MetricExportIntervalMs;
+            });
+    })
+    .WithTracing(tracingBuilder =>
+    {
+        tracingBuilder
+            // Span raíz de cada request que entra al sistema.
+            .AddAspNetCoreInstrumentation(options =>
+            {
+                options.Filter = TracingExtensions.ShouldTrace;
+                options.RecordException = true;
+            })
+            // Span de la llamada que YARP hace al microservicio; YARP inyecta traceparent en el request saliente.
+            .AddHttpClientInstrumentation(options => options.RecordException = true)
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = otlpEndpoint;
+                options.Protocol = OtlpExportProtocol.Grpc;
+            });
     });
 
 builder.Services.AddEndpointsApiExplorer();
