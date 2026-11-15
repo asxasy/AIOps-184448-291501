@@ -9,6 +9,8 @@ using OpenTelemetry.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Exporter;
+using OpenTelemetry.Trace;
+using Instrumentation;
 
 
 
@@ -23,6 +25,16 @@ namespace PharmaGo.Factory
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("PharmaGo.WebApi"))
                     .AddAspNetCoreInstrumentation()
                     .AddMeter("PharmaGo.CustomMetrics")
+                    .AddOtlpExporter(options =>
+                        {
+                            options.Endpoint = new Uri("http://otlp-collector:4317");
+                            options.Protocol = OtlpExportProtocol.Grpc;
+                        });
+                    })
+                    // Monolito (no se despliega en K8s): trazas por OTLP para mantener la misma configuración que los microservicios.
+                    .WithTracing(tracingBuilder => { tracingBuilder
+                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("PharmaGo.WebApi"))
+                    .AddAspNetCoreInstrumentation(options => options.Filter = TracingExtensions.ShouldTrace)
                     .AddOtlpExporter(options =>
                         {
                             options.Endpoint = new Uri("http://otlp-collector:4317");

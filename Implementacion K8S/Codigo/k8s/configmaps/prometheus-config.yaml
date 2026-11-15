@@ -29,6 +29,12 @@ data:
         static_configs:
           - targets: ['pharmago-api-gateway:80']
 
+      # Métricas internas de Jaeger (spans recibidos, memoria) y su up.
+      - job_name: 'jaeger'
+        metrics_path: /metrics
+        static_configs:
+          - targets: ['jaeger:14269']
+
       - job_name: 'node-exporter'
         metrics_path: /metrics
         static_configs:

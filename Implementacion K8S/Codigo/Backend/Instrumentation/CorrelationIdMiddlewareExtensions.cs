@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,11 @@ public static class CorrelationIdMiddlewareExtensions
                 : header.Trim();
             context.Items[HttpContextItemKey] = correlationId;
             context.Response.Headers["X-Correlation-ID"] = correlationId;
+            TagCurrentActivity(correlationId);
+            // Devuelve el trace_id para buscar la traza en Jaeger y los logs en Kibana (Scopes.TraceId).
+            var traceId = Activity.Current?.TraceId.ToHexString();
+            if (!string.IsNullOrEmpty(traceId))
+                context.Response.Headers["X-Trace-Id"] = traceId;
             await next();
         });
     }
@@ -38,6 +44,7 @@ public static class CorrelationIdMiddlewareExtensions
                 ? context.TraceIdentifier
                 : header.Trim();
             context.Items[HttpContextItemKey] = correlationId;
+            TagCurrentActivity(correlationId);
 
             var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
             var log = loggerFactory.CreateLogger("Request");
@@ -45,4 +52,8 @@ public static class CorrelationIdMiddlewareExtensions
                 await next();
         });
     }
+
+    /// <summary>Copia el correlation id al span HTTP actual para poder buscarlo en Jaeger (tag correlation_id).</summary>
+    private static void TagCurrentActivity(string correlationId) =>
+        Activity.Current?.SetTag("correlation_id", correlationId);
 }

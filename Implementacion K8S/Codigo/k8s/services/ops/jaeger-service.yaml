@@ -1,0 +1,24 @@
+# Solo interno: el collector llega por DNS (jaeger:4317) y la UI se abre con port-forward
+# (kubectl port-forward svc/jaeger 16686:16686 -n pharmago). No se expone la ingesta OTLP fuera del clúster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: pharmago
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - port: 4317
+    targetPort: 4317
+    protocol: TCP
+    name: otlp-grpc
+  - port: 16686
+    targetPort: 16686
+    protocol: TCP
+    name: ui
+  - port: 14269
+    targetPort: 14269
+    protocol: TCP
+    name: admin
+  type: ClusterIP

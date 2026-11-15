@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -119,7 +120,9 @@ namespace Instrumentation
                 ["timestamp_utc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
                 ["level"] = ToLevelLabel(logLevel),
                 ["service"] = _hostEnvironment.ApplicationName,
-                ["correlation_id"] = correlationId
+                ["correlation_id"] = correlationId,
+                // Mismo id que la traza en Jaeger: permite saltar de un evento de negocio en Kibana a su traza.
+                ["trace_id"] = Activity.Current?.TraceId.ToHexString() ?? "none"
             };
 
             if (metadata != null)
