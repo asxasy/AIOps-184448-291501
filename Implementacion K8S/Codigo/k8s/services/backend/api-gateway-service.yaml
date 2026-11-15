@@ -11,4 +11,12 @@ spec:
     targetPort: 80
     protocol: TCP
   type: ClusterIP
-
+  # Los contadores del rate limit (AspNetCoreRateLimit en memoria) son por
+  # réplica. Con afinidad por IP de origen, kube-proxy manda siempre al mismo
+  # cliente a la misma réplica y el límite efectivo es el configurado (no el
+  # doble). El timeout cubre la ventana más larga del rate limit (1 h).
+  # Si la réplica muere, kube-proxy reasigna al cliente a otra réplica.
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600

@@ -3,8 +3,13 @@ kind: Deployment
 metadata:
   name: pharmago-users-service
   namespace: pharmago
+  labels:
+    app: pharmago-users-service
+    app.kubernetes.io/part-of: pharmago
+    pharmago/tier: backend
 spec:
-  replicas: 1
+  # Alta disponibilidad: 2 réplicas stateless (las sesiones viven en la BD).
+  replicas: 2
   selector:
     matchLabels:
       app: pharmago-users-service
@@ -12,6 +17,8 @@ spec:
     metadata:
       labels:
         app: pharmago-users-service
+        app.kubernetes.io/part-of: pharmago
+        pharmago/tier: backend
     spec:
       affinity:
         nodeAffinity:
@@ -21,6 +28,37 @@ spec:
               - key: node-type
                 operator: In
                 values: [backend, all]
+        # "preferred" porque Minikube tiene un solo nodo: con "required" las
+        # réplicas quedarían en Pending. En multinodo el término entre
+        # microservicios distintos pasa a "required".
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          # No compartir nodo con OTRO microservicio backend.
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: pharmago/tier
+                  operator: In
+                  values: [backend]
+                - key: app
+                  operator: NotIn
+                  values: [pharmago-users-service]
+          # Repartir las réplicas del mismo microservicio en nodos distintos.
+          - weight: 50
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: pharmago-users-service
+      # Nodos backend dedicados en multinodo (taint dedicated=backend:NoSchedule).
+      # En Minikube no hay taints y la toleration no tiene efecto.
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: backend
+        effect: NoSchedule
       containers:
       - name: pharmago-users-service
         image: pharmago-users-service:latest
@@ -46,23 +84,32 @@ spec:
           limits:
             memory: "384Mi"
             cpu: "500m"
+        # /health no registra checks: responde 200 mientras el proceso atiende.
+        # Es la semántica correcta para liveness (una caída de la BD no debe
+        # reiniciar todos los pods). Las fallas de la BD las corta el gateway.
+        # Startup: sin initialDelay (las fallas de startup no reinician nada); hasta
+        # 180 s para migraciones contra SQL Server emulado; detecta el arranque en <= 2 s.
         startupProbe:
           httpGet:
             path: /health
             port: 80
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          failureThreshold: 15
+          periodSeconds: 2
+          timeoutSeconds: 2
+          failureThreshold: 90
+        # Readiness: saca al pod del Service en ~6 s (2 fallas x 3 s).
         readinessProbe:
           httpGet:
             path: /health
             port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 2
+          failureThreshold: 2
+          successThreshold: 1
+        # Liveness: reinicia un contenedor colgado en ~15 s (3 fallas x 5 s).
         livenessProbe:
           httpGet:
             path: /health
             port: 80
-          initialDelaySeconds: 60
-          periodSeconds: 30
-
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3

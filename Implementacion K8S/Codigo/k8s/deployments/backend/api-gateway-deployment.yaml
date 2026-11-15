@@ -3,8 +3,15 @@ kind: Deployment
 metadata:
   name: pharmago-api-gateway
   namespace: pharmago
+  labels:
+    app: pharmago-api-gateway
+    app.kubernetes.io/part-of: pharmago
+    pharmago/tier: backend
 spec:
-  replicas: 1
+  # Alta disponibilidad: 2 réplicas. El único estado en memoria son los
+  # contadores del rate limit; el Service usa sessionAffinity ClientIP para
+  # que cada cliente caiga siempre en la misma réplica.
+  replicas: 2
   selector:
     matchLabels:
       app: pharmago-api-gateway
@@ -12,6 +19,8 @@ spec:
     metadata:
       labels:
         app: pharmago-api-gateway
+        app.kubernetes.io/part-of: pharmago
+        pharmago/tier: backend
     spec:
       affinity:
         nodeAffinity:
@@ -21,6 +30,37 @@ spec:
               - key: node-type
                 operator: In
                 values: [backend, all]
+        # "preferred" porque Minikube tiene un solo nodo: con "required" las
+        # réplicas quedarían en Pending. En multinodo el término entre
+        # microservicios distintos pasa a "required".
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          # No compartir nodo con OTRO microservicio backend.
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: pharmago/tier
+                  operator: In
+                  values: [backend]
+                - key: app
+                  operator: NotIn
+                  values: [pharmago-api-gateway]
+          # Repartir las réplicas del mismo microservicio en nodos distintos.
+          - weight: 50
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: pharmago-api-gateway
+      # Nodos backend dedicados en multinodo (taint dedicated=backend:NoSchedule).
+      # En Minikube no hay taints y la toleration no tiene efecto.
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: backend
+        effect: NoSchedule
       containers:
       - name: pharmago-api-gateway
         image: pharmago-api-gateway:latest
@@ -38,22 +78,31 @@ spec:
           limits:
             memory: "384Mi"
             cpu: "500m"
+        # /health lo responde el propio proceso del gateway (MapHealthChecks en
+        # Program.cs): no depende de los backends y está en la whitelist del
+        # rate limit. No usar /test-health: depende de users-service y
+        # reiniciaría el gateway en cascada si users cae.
         startupProbe:
-          tcpSocket:
+          httpGet:
+            path: /health
             port: 80
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          failureThreshold: 15
+          periodSeconds: 2
+          timeoutSeconds: 2
+          failureThreshold: 60
+        # Readiness: saca al pod del Service en ~6 s (2 fallas x 3 s).
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /health
             port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 2
+          failureThreshold: 2
+          successThreshold: 1
+        # Liveness: reinicia un contenedor colgado en ~15 s (3 fallas x 5 s).
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /health
             port: 80
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 5
-
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
