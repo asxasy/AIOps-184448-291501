@@ -25,6 +25,13 @@ spec:
               - key: node-type
                 operator: In
                 values: [ops, all]
+      # Nodos ops dedicados en multinodo (taint dedicated=ops:NoSchedule).
+      # En Minikube no hay taints y la toleration no tiene efecto.
+      tolerations:
+      - key: dedicated
+        operator: Equal
+        value: ops
+        effect: NoSchedule
       containers:
       - name: jaeger
         image: jaegertracing/all-in-one:1.76.0
