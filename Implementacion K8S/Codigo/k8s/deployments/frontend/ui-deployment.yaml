@@ -10,6 +10,14 @@ metadata:
 spec:
   # Alta disponibilidad: 2 réplicas de nginx sirviendo estáticos (stateless).
   replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  minReadySeconds: 5
+  progressDeadlineSeconds: 300
   selector:
     matchLabels:
       app: pharmago-ui
@@ -20,6 +28,8 @@ spec:
         app.kubernetes.io/part-of: pharmago
         pharmago/tier: frontend
     spec:
+      # nginx:alpine se detiene con SIGQUIT (apagado ordenado); 30 s sobran.
+      terminationGracePeriodSeconds: 30
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -73,3 +83,7 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
