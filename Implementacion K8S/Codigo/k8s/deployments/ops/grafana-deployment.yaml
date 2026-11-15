@@ -70,6 +70,10 @@ spec:
         - name: grafana-dashboard-golden-signals
           mountPath: /etc/grafana/provisioning/dashboards/pharmago-golden-signals.json
           subPath: pharmago-golden-signals.json
+        # Alertas, contact point y notification policy (se leen solo al arrancar Grafana).
+        - name: grafana-alerting
+          mountPath: /etc/grafana/provisioning/alerting/alerting.yaml
+          subPath: alerting.yaml
         resources:
           requests:
             memory: "256Mi"
@@ -114,4 +118,7 @@ spec:
       - name: grafana-dashboard-golden-signals
         configMap:
           name: grafana-dashboard-golden-signals
+      - name: grafana-alerting
+        configMap:
+          name: grafana-alerting
 
