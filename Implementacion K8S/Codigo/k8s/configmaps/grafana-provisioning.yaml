@@ -17,6 +17,14 @@ data:
         jsonData:
           timeInterval: 5s
           queryTimeout: 60s
+      # Trazas en Grafana (Explore): búsqueda por servicio, operación, tags y duración, y vista de cada traza.
+      # La UI propia de Jaeger sigue disponible por port-forward en :16686.
+      - name: Jaeger
+        type: jaeger
+        uid: jaeger
+        access: proxy
+        url: http://jaeger:16686
+        editable: true
   dashboards.yml: |
     apiVersion: 1
     providers:
