@@ -1,0 +1,60 @@
+# PodDisruptionBudgets de los componentes stateless de PharmaGo.
+#
+# Un PDB limita las interrupciones VOLUNTARIAS que pasan por la Eviction API
+# (kubectl drain, upgrade de nodos, autoscaler). Con 2 réplicas y minAvailable: 1
+# se puede desalojar un pod por vez, nunca los dos. No aplica a rolling updates
+# (eso lo gobierna maxUnavailable: 0 del Deployment) ni a "kubectl delete pod"
+# o caídas involuntarias (eso lo cubre el ReplicaSet + probes).
+#
+# Como la podAntiAffinity, está pensado para el clúster multinodo: el drain saca
+# una réplica y la API rechaza desalojar la segunda hasta que el reemplazo de la
+# primera esté READY en otro nodo. En Minikube (un nodo) ese reemplazo queda
+# Pending, la segunda réplica queda protegida y el drain reintenta hasta su
+# --timeout; la BD y la observabilidad no tienen PDB y se desalojan igual.
+# Para salir: cortar el drain y "kubectl uncordon minikube".
+#
+# La BD queda sin PDB a propósito: tiene 1 réplica y minAvailable: 1 bloquearía
+# cualquier drain del nodo para siempre.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-api-gateway-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-api-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-users-service-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-users-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-pharmacy-service-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-pharmacy-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-ui-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-ui

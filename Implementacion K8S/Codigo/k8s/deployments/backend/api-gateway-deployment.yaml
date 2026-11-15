@@ -12,6 +12,16 @@ spec:
   # contadores del rate limit; el Service usa sessionAffinity ClientIP para
   # que cada cliente caiga siempre en la misma réplica.
   replicas: 2
+  revisionHistoryLimit: 5
+  # Despliegue seguro: nunca baja de 2 réplicas listas; primero levanta la nueva
+  # y recién cuando está READY durante minReadySeconds da de baja una vieja.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  minReadySeconds: 5
+  progressDeadlineSeconds: 300
   selector:
     matchLabels:
       app: pharmago-api-gateway
@@ -22,6 +32,8 @@ spec:
         app.kubernetes.io/part-of: pharmago
         pharmago/tier: backend
     spec:
+      # Debe superar preStop (5 s) + apagado ordenado de ASP.NET Core (5 s por defecto).
+      terminationGracePeriodSeconds: 30
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -106,3 +118,9 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+        lifecycle:
+          preStop:
+            # Da tiempo a que el endpoint salga del Service (kube-proxy) antes
+            # del SIGTERM, así ninguna conexión nueva llega a un pod que se apaga.
+            exec:
+              command: ["sleep", "5"]

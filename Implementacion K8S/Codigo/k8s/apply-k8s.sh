@@ -154,6 +154,10 @@ kubectl apply -f services/frontend/ui-service.yaml
 kubectl apply -f deployments/frontend/ui-deployment.yaml
 
 echo ""
+echo "10. PodDisruptionBudgets (al menos 1 réplica disponible durante disrupciones voluntarias)..."
+kubectl apply -f policies/pod-disruption-budgets.yaml
+
+echo ""
 echo "=== Despliegue completado ==="
 echo ""
 echo "Verificando estado de los pods..."
