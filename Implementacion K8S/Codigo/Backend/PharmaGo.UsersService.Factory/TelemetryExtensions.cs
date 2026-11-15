@@ -28,10 +28,11 @@ namespace PharmaGo.UsersService.Factory
                     .AddHttpClientInstrumentation()
                     .AddMeter("PharmaGo.CustomMetrics")
                     .AddPrometheusExporter()
-                    .AddOtlpExporter(options =>
+                    .AddOtlpExporter((exporterOptions, readerOptions) =>
                         {
-                            options.Endpoint = otlpEndpoint;
-                            options.Protocol = OtlpExportProtocol.Grpc;
+                            exporterOptions.Endpoint = otlpEndpoint;
+                            exporterOptions.Protocol = OtlpExportProtocol.Grpc;
+                            readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = TracingExtensions.MetricExportIntervalMs;
                         });
                     })
                     .WithTracing(tracingBuilder => { tracingBuilder

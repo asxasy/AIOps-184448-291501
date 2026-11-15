@@ -162,6 +162,11 @@ echo "10. PodDisruptionBudgets (al menos 1 réplica disponible durante disrupcio
 kubectl apply -f policies/pod-disruption-budgets.yaml
 
 echo ""
+echo "11. Recargando configuración de Prometheus..."
+# Prometheus monta su config con subPath: un cambio en el ConfigMap no llega al pod sin reiniciarlo.
+kubectl rollout restart deployment/prometheus -n pharmago
+
+echo ""
 echo "=== Despliegue completado ==="
 echo ""
 echo "Verificando estado de los pods..."

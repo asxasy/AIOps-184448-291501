@@ -9,25 +9,45 @@ data:
       scrape_interval: 5s
 
     scrape_configs:
+      # Métricas de la aplicación: llegan por OTLP al collector y Prometheus las lee acá.
+      # El servicio de origen queda en el label exported_job (PharmaGo.ApiGateway,
+      # PharmaGo.UsersService, PharmaGo.PharmacyService) y la réplica en exported_instance (nombre del pod).
       - job_name: 'otlp-collector'
         metrics_path: /metrics
         static_configs:
           - targets: ['otlp-collector:8889']
-      
+
+      # Disponibilidad de cada servicio a través de su Service de Kubernetes: solo se usa la serie
+      # sintética up (1 si el Service responde, 0 si no hay pods listos o no hay red).
+      # Las métricas de la app se descartan acá porque ya llegan por OTLP: con más de una réplica,
+      # scrapear a través del Service alterna entre pods y los contadores saltan (rate() erróneo),
+      # y además se contarían dos veces en los dashboards.
       - job_name: 'users-service'
         metrics_path: /metrics
         static_configs:
           - targets: ['pharmago-users-service:80']
-      
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: '.+'
+            action: drop
+
       - job_name: 'pharmacy-service'
         metrics_path: /metrics
         static_configs:
           - targets: ['pharmago-pharmacy-service:80']
-      
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: '.+'
+            action: drop
+
       - job_name: 'api-gateway'
         metrics_path: /metrics
         static_configs:
           - targets: ['pharmago-api-gateway:80']
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: '.+'
+            action: drop
 
       # Métricas internas de Jaeger (spans recibidos, memoria) y su up.
       - job_name: 'jaeger'

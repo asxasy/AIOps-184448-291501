@@ -13,6 +13,9 @@ public static class TracingExtensions
     public static Uri OtlpEndpoint =>
         new(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://otlp-collector:4317");
 
+    /// <summary>Cada cuánto se empujan las métricas por OTLP (default del SDK: 60 s, demasiado lento para alertar).</summary>
+    public const int MetricExportIntervalMs = 10000;
+
     /// <summary>
     /// Requests de infraestructura que no se trazan: probes de Kubernetes (/health) y scrapes de Prometheus (/metrics).
     /// Llegan cada 5-10 s y llenarían Jaeger de trazas sin valor.

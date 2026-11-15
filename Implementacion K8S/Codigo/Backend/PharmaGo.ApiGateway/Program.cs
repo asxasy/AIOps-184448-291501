@@ -66,7 +66,14 @@ builder.Services.AddOpenTelemetry()
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddMeter("PharmaGo.CustomMetrics")
-            .AddPrometheusExporter();
+            .AddPrometheusExporter()
+            // Métricas por OTLP al collector, igual que los microservicios (el collector las expone a Prometheus).
+            .AddOtlpExporter((exporterOptions, readerOptions) =>
+            {
+                exporterOptions.Endpoint = otlpEndpoint;
+                exporterOptions.Protocol = OtlpExportProtocol.Grpc;
+                readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = TracingExtensions.MetricExportIntervalMs;
+            });
     })
     .WithTracing(tracingBuilder =>
     {
