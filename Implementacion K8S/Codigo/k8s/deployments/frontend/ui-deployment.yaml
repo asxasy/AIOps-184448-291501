@@ -83,6 +83,9 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+          # Solo cuando reinicia la liveness. Un proceso colgado no atiende SIGTERM:
+          # esperar los 30 s del pod solo alarga el MTTR. Rollouts y borrados siguen con 30 s.
+          terminationGracePeriodSeconds: 5
         lifecycle:
           preStop:
             exec:
