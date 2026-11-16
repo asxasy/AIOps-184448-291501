@@ -144,5 +144,5 @@ Además:
 ```bash
 ./port-forward.sh --stop
 minikube stop          # apaga el clúster y conserva todo
-./cleanup.sh           # borra el namespace y los volúmenes (se pierden los datos)
+./cleanup.sh           # borra el namespace y los PersistentVolumes; los datos quedan en el nodo (/mnt/data) hasta minikube delete
 ```
