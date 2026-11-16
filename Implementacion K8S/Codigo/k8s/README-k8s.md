@@ -2,6 +2,8 @@
 
 Esta guía describe cómo desplegar la aplicación PharmaGo en un cluster de Kubernetes usando Minikube con un solo nodo.
 
+> Guía paso a paso de la versión del obligatorio (con los cambios del grupo y la carga de los datos de prueba): [`README.md`](../../../README.md) en la raíz del repositorio.
+
 ## Arquitectura
 
 La aplicación se ejecuta en un único nodo (minikube) con todos los componentes:
