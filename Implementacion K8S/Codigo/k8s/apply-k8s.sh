@@ -80,7 +80,7 @@ echo "   Esperando a que la base de datos esté lista..."
 timeout=0
 max_timeout=300
 while [ $timeout -lt $max_timeout ]; do
-    pod_ready=$(kubectl get pod -l app=pharmago-db -n pharmago -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+    pod_ready=$(kubectl get pod -l app=pharmago-db -n pharmago -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
     if [ "$pod_ready" = "True" ]; then
         echo "   Base de datos lista!"
         break
@@ -104,7 +104,7 @@ echo "   Esperando a que Elasticsearch esté listo..."
 timeout=0
 max_timeout=300
 while [ $timeout -lt $max_timeout ]; do
-    pod_ready=$(kubectl get pod -l app=elasticsearch -n pharmago -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+    pod_ready=$(kubectl get pod -l app=elasticsearch -n pharmago -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
     if [ "$pod_ready" = "True" ]; then
         echo "   Elasticsearch listo!"
         break
