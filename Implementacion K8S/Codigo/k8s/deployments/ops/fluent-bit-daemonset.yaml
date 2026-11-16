@@ -17,10 +17,11 @@ spec:
         version: v1
     spec:
       serviceAccountName: fluent-bit
+      # Un pod por nodo para leer los logs de todos: tiene que entrar también
+      # en los nodos con taint (backend, frontend, ops y control plane).
+      # Sin key, "Exists" tolera cualquier taint, igual que node-exporter.
       tolerations:
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
+        - operator: Exists
       containers:
         - name: fluent-bit
           image: fluent/fluent-bit:2.2.2
