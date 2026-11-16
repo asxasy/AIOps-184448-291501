@@ -1,5 +1,8 @@
-# Jaeger all-in-one: recibe trazas por OTLP desde el otel-collector y las muestra en su UI (puerto 16686).
-# Almacenamiento en memoria acotado a 5000 trazas: se pierden al reiniciar el pod, alcanza para la demo.
+# Jaeger v2: recibe trazas por OTLP desde el otel-collector y las muestra en su UI (puerto 16686).
+# La configuración (memoria acotada a 5000 trazas, puertos) está en configmaps/jaeger-config.yaml.
+# Versión fija 2.20.0, no la última: la 2.21.0 sacó los endpoints HTTP /api/services y /api/traces,
+# que son los que usa el data source Jaeger de Grafana 10.4. Jaeger v1 (all-in-one 1.x) no tiene
+# soporte desde el 31/12/2025.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,14 +37,10 @@ spec:
         effect: NoSchedule
       containers:
       - name: jaeger
-        image: jaegertracing/all-in-one:1.76.0
+        image: jaegertracing/jaeger:2.20.0
         args:
-          - "--memory.max-traces=5000"
+          - "--config=/etc/jaeger/config.yaml"
         env:
-        - name: SPAN_STORAGE_TYPE
-          value: "memory"
-        - name: COLLECTOR_OTLP_ENABLED
-          value: "true"
         # El GC de Go respeta este techo antes de llegar al límite del contenedor.
         - name: GOMEMLIMIT
           value: "320MiB"
@@ -50,8 +49,10 @@ spec:
           name: otlp-grpc
         - containerPort: 16686
           name: ui
-        - containerPort: 14269
-          name: admin
+        - containerPort: 8888
+          name: metrics
+        - containerPort: 13133
+          name: health
         resources:
           requests:
             memory: "128Mi"
@@ -61,13 +62,21 @@ spec:
             cpu: "300m"
         readinessProbe:
           httpGet:
-            path: /
-            port: 14269
+            path: /status
+            port: 13133
           initialDelaySeconds: 5
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /
-            port: 14269
+            path: /status
+            port: 13133
           initialDelaySeconds: 15
           periodSeconds: 30
+        volumeMounts:
+        - name: jaeger-config
+          mountPath: /etc/jaeger
+          readOnly: true
+      volumes:
+      - name: jaeger-config
+        configMap:
+          name: jaeger-config

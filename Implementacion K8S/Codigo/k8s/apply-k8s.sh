@@ -48,6 +48,7 @@ kubectl apply -f configmaps/grafana-dashboard-infra.yaml
 kubectl apply -f configmaps/grafana-dashboard-golden-signals.yaml
 kubectl apply -f configmaps/grafana-alerting.yaml
 kubectl apply -f configmaps/fluent-bit-config.yaml
+kubectl apply -f configmaps/jaeger-config.yaml
 
 echo ""
 echo "5. Creando StorageClass y PersistentVolumes..."

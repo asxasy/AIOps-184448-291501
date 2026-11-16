@@ -1,0 +1,63 @@
+# Configuración de Jaeger v2. La v2 está construida sobre el OpenTelemetry Collector, así que se
+# configura igual que el otel-collector: receivers, processors, exporters y extensions.
+# JAEGER_LISTEN_HOST viene en 0.0.0.0 en la imagen oficial.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-config
+  namespace: pharmago
+data:
+  config.yaml: |
+    service:
+      extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [jaeger_storage_exporter]
+      telemetry:
+        # Métricas propias de Jaeger (spans recibidos, memoria): Prometheus las scrapea en :8888 (job jaeger).
+        metrics:
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: "${env:JAEGER_LISTEN_HOST:-localhost}"
+                    port: 8888
+        logs:
+          level: info
+
+    extensions:
+      # API de consulta y UI en :16686: la usan el port-forward y el data source Jaeger de Grafana.
+      jaeger_query:
+        storage:
+          traces: memstore
+        http:
+          endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:16686"
+
+      # En memoria, acotado a 5000 trazas: se pierden al reiniciar el pod, alcanza para la demo.
+      jaeger_storage:
+        backends:
+          memstore:
+            memory:
+              max_traces: 5000
+
+      # Salud para las probes de Kubernetes: GET :13133/status.
+      healthcheckv2:
+        use_v2: true
+        http:
+          endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:13133"
+
+    receivers:
+      # Solo OTLP gRPC: es lo único que le manda el otel-collector.
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:4317"
+
+    processors:
+      batch:
+
+    exporters:
+      jaeger_storage_exporter:
+        trace_storage: memstore
